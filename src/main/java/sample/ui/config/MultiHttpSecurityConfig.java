@@ -21,12 +21,12 @@ import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.embedded.ServletListenerRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.authentication.encoding.Md5PasswordEncoder;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configurers.GlobalAuthenticationConfigurerAdapter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -34,6 +34,8 @@ import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.annotation.web.servlet.configuration.EnableWebMvcSecurity;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -41,10 +43,12 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
+import org.springframework.security.provisioning.UserDetailsManager;
 import org.springframework.security.web.authentication.RememberMeServices;
 import org.springframework.security.web.authentication.rememberme.InMemoryTokenRepositoryImpl;
 import org.springframework.security.web.authentication.rememberme.JdbcTokenRepositoryImpl;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 /**
@@ -57,9 +61,11 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class MultiHttpSecurityConfig {
 
-    private static final String[] UNSECURED_RESOURCE_LIST = new String[] { "/test.html", "/",
-            "/resources/**", "/assets/**", "/css/**", "/webjars/**", "/images/**",
-            "/dandelion-assets/**", "/unauthorized", "/error*", "/users*" };
+    private static final String[] UNSECURED_RESOURCE_LIST = new String[] { "/resources/**",
+            "/assets/**", "/css/**", "/webjars/**", "/images/**", "/dandelion-assets/**" };
+
+    private static final String[] UNAUTHORIZED_RESOURCE_LIST = new String[] { "/test.html", "/",
+            "/unauthorized", "/error*", "/users*" };
 
     @Configuration
     @Profile({ "intdb" })
@@ -81,8 +87,8 @@ public class MultiHttpSecurityConfig {
 
         public class BasicRememberMeUserDetailsService implements UserDetailsService {
             @Override
-            public UserDetails loadUserByUsername(String userName) throws UsernameNotFoundException {
-                return new User(userName, "", Collections.<GrantedAuthority> emptyList());
+            public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+                return new User(username, "", Collections.<GrantedAuthority> emptyList());
             }
         }
     }
@@ -123,29 +129,15 @@ public class MultiHttpSecurityConfig {
         public void init(AuthenticationManagerBuilder auth) throws Exception {
             //@formatter:off
             auth
-                .inMemoryAuthentication()
-                    .passwordEncoder(new Md5PasswordEncoder())
-                .withUser("user")
-                    .password("5f4dcc3b5aa765d61d8327deb882cf99")
-//                    .password("password")
-                        .roles("USER")
-                .and()
-                    .withUser("admin").password("5f4dcc3b5aa765d61d8327deb882cf99")
-                        .roles("USER", "ADMIN")
-                .and()
-                    .withUser("keith").password("417c7382b16c395bc25b5da1398cf076")
-                        .roles("USER", "SUPERVISOR")
-                .and()
-                    .withUser("erwin").password("12430911a8af075c6f41c6976af22b09")
-                        .roles("USER", "SUPERVISOR")
-                .and()
-                    .withUser("jeremy").password("57c6cbff0d421449be820763f03139eb")
-                        .roles("USER")
-                .and()
-                    .withUser("scott").password("942f2339bf50796de535a384f0d1af3e")
-                        .roles("USER")
+              .userDetailsService(getUserDetailsManager())
+                  .passwordEncoder(new BCryptPasswordEncoder())
             ;
             //@formatter:on
+        }
+
+        @Bean
+        public UserDetailsManager getUserDetailsManager() {
+            return new DBDrivenUserDetailsManager();
         }
     }
 
@@ -166,10 +158,11 @@ public class MultiHttpSecurityConfig {
 
             auth
                 .userDetailsService(userDetailsService)
-                    .passwordEncoder(encoder);
-            auth
-                .jdbcAuthentication()
-                    .dataSource(dataSource);
+                    .passwordEncoder(encoder)
+                .and()
+                    .jdbcAuthentication()
+                        .dataSource(dataSource)
+            ;
             //@formatter:on
         }
     }
@@ -240,6 +233,10 @@ public class MultiHttpSecurityConfig {
                     .xssProtection()
                 .and()
                     .authorizeRequests()
+                        .antMatchers(UNAUTHORIZED_RESOURCE_LIST)
+                            .permitAll()
+                .and()
+                    .authorizeRequests()
                         .anyRequest()
                             .authenticated()
                 .and()
@@ -249,7 +246,7 @@ public class MultiHttpSecurityConfig {
                         .permitAll()
                 .and()
                     .rememberMe()
-//                        .useSecureCookie(true)
+                        .useSecureCookie(true)
                         .tokenValiditySeconds(60 * 60 * 24 * 10) // 10 days
                         .rememberMeServices(rememberMeServices)
                         .key(rememberMeToken)
@@ -261,10 +258,22 @@ public class MultiHttpSecurityConfig {
                     .sessionManagement()
                     .maximumSessions(1)
                     .maxSessionsPreventsLogin(false)
-                    // TODO change to maxSessionsPreventLogin
-                    // .maxSessionsPreventsLogin(true)
+                    .maxSessionsPreventsLogin(true)
+                    .sessionRegistry(sessionRegistry())
                     .expiredUrl("/login?expired");
             // @formatter:on
         }
+
+        @Bean
+        public SessionRegistry sessionRegistry() {
+            SessionRegistry sessionRegistry = new SessionRegistryImpl();
+            return sessionRegistry;
+        }
+    }
+
+    // Register HttpSessionEventPublisher
+    @Bean
+    public static ServletListenerRegistrationBean<HttpSessionEventPublisher> httpSessionEventPublisher() {
+        return new ServletListenerRegistrationBean<HttpSessionEventPublisher>(new HttpSessionEventPublisher());
     }
 }

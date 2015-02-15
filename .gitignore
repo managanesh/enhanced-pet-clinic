@@ -6,3 +6,6 @@ application.pid
 file*.txt
 xml*.xml
 target/
+.idea
+enhanced-pet-clinic.iml
+/application.port
