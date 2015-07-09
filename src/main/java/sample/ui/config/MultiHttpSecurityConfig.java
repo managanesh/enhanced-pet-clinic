@@ -16,9 +16,7 @@
 package sample.ui.config;
 
 import java.util.Collections;
-
 import javax.sql.DataSource;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.embedded.ServletListenerRegistrationBean;
@@ -31,8 +29,8 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.authentication.configurers.GlobalAuthenticationConfigurerAdapter;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.builders.WebSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-import org.springframework.security.config.annotation.web.servlet.configuration.EnableWebMvcSecurity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.session.SessionRegistry;
 import org.springframework.security.core.session.SessionRegistryImpl;
@@ -57,7 +55,7 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
  * @author Arnaldo Piccinelli
  */
 @Configuration
-@EnableWebMvcSecurity
+@EnableWebSecurity
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class MultiHttpSecurityConfig {
 
@@ -226,13 +224,7 @@ public class MultiHttpSecurityConfig {
         @Override
         protected void configure(HttpSecurity http) throws Exception {
             //@formatter:off
-            http
-                .headers()
-                    .httpStrictTransportSecurity()
-                    .frameOptions()
-                    .xssProtection()
-                .and()
-                    .authorizeRequests()
+            http.authorizeRequests()
                         .antMatchers(UNAUTHORIZED_RESOURCE_LIST)
                             .permitAll()
                 .and()
@@ -261,6 +253,12 @@ public class MultiHttpSecurityConfig {
                     .maxSessionsPreventsLogin(true)
                     .sessionRegistry(sessionRegistry())
                     .expiredUrl("/login?expired");
+            http.headers()
+                    .frameOptions()
+                .and()
+                    .xssProtection()
+                .and()
+                    .httpStrictTransportSecurity();
             // @formatter:on
         }
 
