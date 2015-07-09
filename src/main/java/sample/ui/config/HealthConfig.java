@@ -13,7 +13,7 @@ public class HealthConfig {
         return new HealthIndicator() {
             @Override
             public Health health() {
-                return Health.down().build();
+                return Health.up().withDetail("Hello", "World!").build();
             }
         };
     }
