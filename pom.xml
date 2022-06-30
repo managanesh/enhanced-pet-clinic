@@ -23,7 +23,7 @@
         <start-class>sample.ui.SampleWebUiApplication</start-class>
 
         <!-- Web Flow -->
-        <webflow-version>2.4.0.RELEASE</webflow-version>
+        <webflow-version>2.4.6.RELEASE</webflow-version>
 
         <!-- Tomcat -->
         <tomcat.version>8.0.8</tomcat.version>
