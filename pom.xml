@@ -35,7 +35,7 @@
         <ehcache.version>2.6.6</ehcache.version>
 
         <!-- Web dependencies -->
-        <webjars-bootstrap.version>3.2.0</webjars-bootstrap.version>
+        <webjars-bootstrap.version>3.4.0</webjars-bootstrap.version>
         <webjars-jquery.version>2.1.1</webjars-jquery.version>
         <webjars-jquery-ui.version>1.11.0</webjars-jquery-ui.version>
         <webjars-jquery-ui-themes.version>1.10.3</webjars-jquery-ui-themes.version>
